@@ -1,40 +1,41 @@
 #!/usr/bin/env python3
-"""news-image-01 entry program.
+"""Copy the finished news-image entry to the grader output directory.
 
-The entry image lives in this repository as entry.png, next to this file.
-The program's whole job is to copy those bytes, unchanged, to
-<output dir>/entry.png, where the output dir is $MAKEFUN_OUTPUT_DIR when
-set and /output otherwise (in the grader's container only /output is
-writable, and no environment variable is set). The default is the
-absolute path /output, never a relative directory.
+The entry image lives next to this script in the repository. This program
+moves it, unchanged, into the directory named by MAKEFUN_OUTPUT_DIR (or
+"/output" when that variable is absent) under the name "entry.png".
 
-Standard library only; no network; deterministic: running it any number
-of times writes the same bytes.
+Only the Python standard library is used, there is no network access, and
+the copy is a plain byte-for-byte transfer, so the result is deterministic.
+If the output directory happens to be the repository directory itself, the
+copy is skipped because source and destination are already the same file.
 """
 
 import os
+import shutil
+import sys
+from pathlib import Path
 
-# Copy in 256 KiB blocks: small enough to stream comfortably inside the
-# grader's 512 MB container, large enough to finish near-instantly.
-CHUNK_SIZE = 256 * 1024
-
-
-def copy_entry(src: str, dst: str) -> None:
-    """Copy src to dst byte for byte, in chunks."""
-    with open(src, "rb") as fin, open(dst, "wb") as fout:
-        while True:
-            chunk = fin.read(CHUNK_SIZE)
-            if not chunk:
-                break
-            fout.write(chunk)
+SOURCE_NAME = "entry.png"
+DEFAULT_OUTPUT_DIR = "/output"
 
 
-def main() -> None:
-    out_dir = os.environ.get("MAKEFUN_OUTPUT_DIR", "/output")
-    os.makedirs(out_dir, exist_ok=True)
-    src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "entry.png")
-    copy_entry(src, os.path.join(out_dir, "entry.png"))
+def main() -> int:
+    script_dir = Path(__file__).resolve().parent
+    source = script_dir / SOURCE_NAME
+
+    if not source.is_file():
+        print(f"missing source image: {source}", file=sys.stderr)
+        return 1
+
+    output_dir = Path(os.environ.get("MAKEFUN_OUTPUT_DIR") or DEFAULT_OUTPUT_DIR)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    destination = output_dir / SOURCE_NAME
+    if destination.resolve() != source.resolve():
+        shutil.copyfile(source, destination)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
